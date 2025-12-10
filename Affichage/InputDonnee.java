@@ -119,9 +119,20 @@ public class InputDonnee extends JFrame {
             int pionsHPVal = Integer.parseInt(pionsHP.getText());
             int reineHPVal = Integer.parseInt(reineHP.getText());
             int roiHPVal = Integer.parseInt(roiHP.getText());
-            int fousHPVal = nbPieces >= 4 ? Integer.parseInt(fousHP.getText()) : 0;
-            int cavaliersHPVal = nbPieces >= 6 ? Integer.parseInt(cavaliersHP.getText()) : 0;
-            int toursHPVal = nbPieces >= 8 ? Integer.parseInt(toursHP.getText()) : 0;
+            int fousHPVal = nbPieces >= 4 ? Integer.parseInt(fousHP.getText()) : 1;
+            int cavaliersHPVal = nbPieces >= 6 ? Integer.parseInt(cavaliersHP.getText()) : 1;
+            int toursHPVal = nbPieces >= 8 ? Integer.parseInt(toursHP.getText()) : 1;
+            
+            // Valider que tous les PV sont positifs (> 0)
+            if (pionsHPVal <= 0 || reineHPVal <= 0 || roiHPVal <= 0 || 
+                fousHPVal <= 0 || cavaliersHPVal <= 0 || toursHPVal <= 0) {
+                JOptionPane.showMessageDialog(this, 
+                    "Les points de vie doivent être strictement positifs (> 0)!\n" +
+                    "Valeur minimale: 1", 
+                    "Erreur", 
+                    JOptionPane.ERROR_MESSAGE);
+                return;
+            }
             
             if (listener != null) {
                 listener.onConfigurationConfirmed(nbPieces, pionsHPVal, reineHPVal, roiHPVal, 

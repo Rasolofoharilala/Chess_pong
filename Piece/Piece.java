@@ -9,7 +9,8 @@ public class Piece {
 
     public Piece(String nom, int pointDeVie, boolean isWhite, String symbole, String imagePath) {
         this.nom = nom;
-        this.pointDeVie = pointDeVie;
+        // Assurer que les PV sont toujours > 0 lors de l'initialisation
+        this.pointDeVie = Math.max(1, pointDeVie);
         this.isWhite = isWhite;
         this.symbole = symbole;
         this.imagePath = imagePath;
@@ -40,6 +41,17 @@ public class Piece {
     }
 
     public void setPointDeVie(int pointDeVie) {
-        this.pointDeVie = pointDeVie;
+        // Assurer que les PV sont toujours > 0
+        this.pointDeVie = Math.max(1, pointDeVie);
+    }
+    
+    // Méthode pour infliger des dégâts à la pièce
+    public void takeDamage(int damage) {
+        this.pointDeVie = Math.max(1, this.pointDeVie - damage);
+    }
+    
+    // Vérifier si la pièce est encore en vie
+    public boolean isAlive() {
+        return this.pointDeVie > 0;
     }
 }

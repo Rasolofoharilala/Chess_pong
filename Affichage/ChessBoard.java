@@ -19,6 +19,14 @@ public class ChessBoard {
     private Piece[][] pieces;  // Grille pour stocker les pièces
     private Map<String, BufferedImage> imageCache;  // Cache pour les images
     private Map<String, Integer> maxHP;  // Points de vie maximum par type de pièce
+    private Ball ball;  // La balle qui rebondit
+    private Timer gameTimer;  // Timer pour l'animation
+    private JPanel boardPanel;  // Référence au panel pour le rafraîchissement
+    private boolean gameOver;  // Indicateur de fin de partie
+    private String winner;  // Le gagnant ("Blanc" ou "Noir")
+    private Paddle whitePaddle;  // Paddle du camp blanc (bas)
+    private Paddle blackPaddle;  // Paddle du camp noir (haut)
+    private boolean[] keysPressed = new boolean[256];  // Suivi des touches appuyées
 
     // Couleurs officielles chess.com (extraites du site en 2025)
     private static final Color CASE_CLAIRE = new Color(240, 217, 181);  // beige clair
@@ -39,6 +47,17 @@ public class ChessBoard {
         this.pieces = new Piece[8][8];  // Grille 8x8 pour les pièces
         this.imageCache = new HashMap<>();  // Initialiser le cache d'images
         this.maxHP = new HashMap<>();  // Initialiser les HP max
+        
+        // La balle sera initialisée plus tard avec les bonnes coordonnées
+        this.ball = null;
+        
+        // Les paddles seront initialisés plus tard
+        this.whitePaddle = null;
+        this.blackPaddle = null;
+        
+        // Initialiser l'état du jeu
+        this.gameOver = false;
+        this.winner = null;
     }
     
     // Méthode pour charger une image
@@ -212,12 +231,85 @@ public class ChessBoard {
         g2d.setFont(oldFont);
     }
 
+    // Méthode pour vérifier si un roi est mort et déterminer le gagnant
+    private void checkGameOver() {
+        boolean whiteKingAlive = false;
+        boolean blackKingAlive = false;
+        
+        for (int row = 0; row < 8; row++) {
+            for (int col = 0; col < 8; col++) {
+                Piece piece = pieces[row][col];
+                if (piece != null && piece.getNom().equals("Roi")) {
+                    if (piece.isWhite()) {
+                        whiteKingAlive = true;
+                    } else {
+                        blackKingAlive = true;
+                    }
+                }
+            }
+        }
+        
+        // Vérifier si un roi est mort
+        if (!whiteKingAlive && blackKingAlive) {
+            gameOver = true;
+            winner = "Noir";
+            gameTimer.stop();
+        } else if (!blackKingAlive && whiteKingAlive) {
+            gameOver = true;
+            winner = "Blanc";
+            gameTimer.stop();
+        }
+    }
+    
+    // Méthode pour vérifier les collisions avec les paddles
+    private void checkPaddleCollisions() {
+        if (whitePaddle != null && whitePaddle.checkCollisionWithBall(ball)) {
+            whitePaddle.bounceOffBall(ball);
+            return;
+        }
+        
+        if (blackPaddle != null && blackPaddle.checkCollisionWithBall(ball)) {
+            blackPaddle.bounceOffBall(ball);
+            return;
+        }
+    }
+    
+    // Méthode pour vérifier les collisions et infliger des dégâts
+    private void checkBallCollisions(int cellSize) {
+        // Vérifier d'abord les collisions avec les paddles
+        checkPaddleCollisions();
+        
+        // Ensuite vérifier les collisions avec les pièces
+        for (int row = 0; row < 8; row++) {
+            for (int col = 0; col < 8; col++) {
+                Piece piece = pieces[row][col];
+                if (piece != null && ball.checkCollisionWithPiece(row, col, cellSize)) {
+                    // La balle rebondit sur la pièce
+                    ball.bounceOff(row, col, cellSize);
+                    
+                    // Infliger 1 point de dégât à la pièce
+                    piece.takeDamage(1);
+                    
+                    // Supprimer la pièce si elle n'a plus de points de vie
+                    if (!piece.isAlive()) {
+                        pieces[row][col] = null;
+                        // Vérifier si le jeu est terminé
+                        checkGameOver();
+                    }
+                    
+                    // Sortir après la première collision détectée
+                    return;
+                }
+            }
+        }
+    }
+
     public JPanel getPanel() {
         // Capture des valeurs de l'instance ChessBoard pour utilisation dans la classe anonyme
         final int rows = this.row;
         final int cols = this.col;
         
-        return new JPanel() {
+        boardPanel = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
@@ -272,6 +364,19 @@ public class ChessBoard {
                     }
                 }
 
+                // Dessiner les paddles
+                if (whitePaddle != null && !gameOver) {
+                    whitePaddle.draw(g2d);
+                }
+                if (blackPaddle != null && !gameOver) {
+                    blackPaddle.draw(g2d);
+                }
+                
+                // Dessiner la balle
+                if (ball != null && !gameOver) {
+                    ball.draw(g2d);
+                }
+
                 // Bordure fine autour de l'échiquier (comme sur chess.com)
                 g.setColor(BORDURE);
                 int borderX = startCol * cellSize;
@@ -279,6 +384,46 @@ public class ChessBoard {
                 int borderWidth = cellSize * cols;
                 int borderHeight = cellSize * rows;
                 g.drawRect(borderX, borderY, borderWidth - 1, borderHeight - 1);
+                
+                // Afficher le message de victoire si le jeu est terminé
+                if (gameOver && winner != null) {
+                    // Fond semi-transparent
+                    g2d.setColor(new Color(0, 0, 0, 180));
+                    g2d.fillRect(0, 0, getWidth(), getHeight());
+                    
+                    // Texte de victoire
+                    g2d.setColor(Color.WHITE);
+                    Font titleFont = new Font("Arial", Font.BOLD, 60);
+                    g2d.setFont(titleFont);
+                    
+                    String victoryText = "Le camp " + winner + " gagne !";
+                    FontMetrics fm = g2d.getFontMetrics();
+                    int textWidth = fm.stringWidth(victoryText);
+                    int textX = (getWidth() - textWidth) / 2;
+                    int textY = getHeight() / 2;
+                    
+                    // Ombre du texte
+                    g2d.setColor(Color.BLACK);
+                    g2d.drawString(victoryText, textX + 3, textY + 3);
+                    
+                    // Texte principal
+                    if (winner.equals("Blanc")) {
+                        g2d.setColor(new Color(255, 215, 0)); // Or pour blanc
+                    } else {
+                        g2d.setColor(new Color(192, 192, 192)); // Argent pour noir
+                    }
+                    g2d.drawString(victoryText, textX, textY);
+                    
+                    // Message additionnel
+                    Font subFont = new Font("Arial", Font.PLAIN, 30);
+                    g2d.setFont(subFont);
+                    g2d.setColor(Color.WHITE);
+                    String subText = "Le roi adverse a été détruit !";
+                    fm = g2d.getFontMetrics();
+                    textWidth = fm.stringWidth(subText);
+                    textX = (getWidth() - textWidth) / 2;
+                    g2d.drawString(subText, textX, textY + 60);
+                }
             }
 
             @Override
@@ -286,5 +431,107 @@ public class ChessBoard {
                 return new Dimension(width, length);
             }
         };
+        
+        // Ajouter le KeyListener pour contrôler les paddles
+        boardPanel.setFocusable(true);
+        boardPanel.addKeyListener(new java.awt.event.KeyAdapter() {
+            @Override
+            public void keyPressed(java.awt.event.KeyEvent e) {
+                if (gameOver) return;
+                keysPressed[e.getKeyCode()] = true;
+            }
+            
+            @Override
+            public void keyReleased(java.awt.event.KeyEvent e) {
+                keysPressed[e.getKeyCode()] = false;
+            }
+        });
+        
+        // Démarrer le timer pour l'animation
+        gameTimer = new Timer(16, e -> {  // ~60 FPS
+            int cellSize = Math.min(boardPanel.getWidth(), boardPanel.getHeight()) / 8;
+            int startCol = (8 - cols) / 2;
+            
+            // Calculer les limites de l'échiquier
+            int minX = startCol * cellSize;
+            int minY = 0;
+            int maxX = minX + (cellSize * cols);
+            int maxY = cellSize * rows;
+            
+            // Initialiser la balle au centre de l'échiquier si elle n'existe pas encore
+            if (ball == null) {
+                int centerX = minX + (maxX - minX) / 2;
+                int centerY = minY + (maxY - minY) / 2;
+                ball = new Ball(centerX, centerY, 10);
+            }
+            
+            // Initialiser les paddles s'ils n'existent pas encore
+            if (whitePaddle == null && blackPaddle == null) {
+                int paddleWidth = cellSize; // 1 case de largeur
+                int paddleHeight = cellSize / 4; // 1 case de hauteur
+                
+                // Paddle blanc - 1 case au-dessus des pions blancs (ligne 5)
+                int whitePaddleY = 5 * cellSize + cellSize / 2;
+                int centerX = minX + (maxX - minX) / 2;
+                whitePaddle = new Paddle(centerX, whitePaddleY, paddleWidth, paddleHeight, true);
+                
+                // Paddle noir - 1 case au-dessus des pions noirs (ligne 2)
+                int blackPaddleY = 2 * cellSize + cellSize / 2;
+                blackPaddle = new Paddle(centerX, blackPaddleY, paddleWidth, paddleHeight, false);
+            }
+            
+            // Traiter les touches appuyées
+            if (!gameOver) {
+                int cellSize2 = Math.min(boardPanel.getWidth(), boardPanel.getHeight()) / 8;
+                int startCol2 = (8 - cols) / 2;
+                int minX2 = startCol2 * cellSize2;
+                int maxX2 = minX2 + (cellSize2 * cols);
+                
+                // Paddle blanc
+                if (keysPressed[java.awt.event.KeyEvent.VK_Q]) {
+                    whitePaddle.moveLeft(minX2);
+                }
+                if (keysPressed[java.awt.event.KeyEvent.VK_D]) {
+                    whitePaddle.moveRight(maxX2);
+                }
+                if (keysPressed[java.awt.event.KeyEvent.VK_A]) {
+                    whitePaddle.tiltLeft();
+                } else if (keysPressed[java.awt.event.KeyEvent.VK_E]) {
+                    whitePaddle.tiltRight();
+                } else {
+                    whitePaddle.stopTilting();
+                }
+                
+                // Paddle noir
+                if (keysPressed[java.awt.event.KeyEvent.VK_LEFT]) {
+                    blackPaddle.moveLeft(minX2);
+                }
+                if (keysPressed[java.awt.event.KeyEvent.VK_RIGHT]) {
+                    blackPaddle.moveRight(maxX2);
+                }
+                if (keysPressed[java.awt.event.KeyEvent.VK_UP]) {
+                    blackPaddle.tiltLeft();
+                } else if (keysPressed[java.awt.event.KeyEvent.VK_DOWN]) {
+                    blackPaddle.tiltRight();
+                } else {
+                    blackPaddle.stopTilting();
+                }
+                
+                // Mettre à jour l'inclinaison des paddles
+                whitePaddle.updateTilt();
+                blackPaddle.updateTilt();
+            }
+            
+            // Ne mettre à jour la balle que si le jeu n'est pas terminé
+            if (!gameOver) {
+                // Mettre à jour la balle avec les limites de l'échiquier
+                ball.update(minX, minY, maxX, maxY);
+                checkBallCollisions(cellSize);
+            }
+            boardPanel.repaint();
+        });
+        gameTimer.start();
+        
+        return boardPanel;
     }
 }
