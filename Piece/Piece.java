@@ -3,13 +3,12 @@ package Piece;
 public class Piece {
     public String nom;
     public int pointDeVie;
-    protected boolean isWhite;  // true = blanc, false = noir
-    protected String symbole;   // Symbole Unicode de la pièce
-    protected String imagePath; // Chemin vers l'image de la pièce
+    protected boolean isWhite;  
+    protected String symbole;   
+    protected String imagePath; 
 
     public Piece(String nom, int pointDeVie, boolean isWhite, String symbole, String imagePath) {
         this.nom = nom;
-        // Assurer que les PV sont toujours > 0 lors de l'initialisation
         this.pointDeVie = Math.max(1, pointDeVie);
         this.isWhite = isWhite;
         this.symbole = symbole;

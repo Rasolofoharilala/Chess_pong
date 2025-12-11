@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import Piece.*;
+import Game.LaunchManager;
 
 public class ChessBoard {
 
@@ -27,6 +28,7 @@ public class ChessBoard {
     private Paddle whitePaddle;  // Paddle du camp blanc (bas)
     private Paddle blackPaddle;  // Paddle du camp noir (haut)
     private boolean[] keysPressed = new boolean[256];  // Suivi des touches appuyées
+    private LaunchManager launchManager;  // Gestionnaire de lancement
 
     // Couleurs officielles chess.com (extraites du site en 2025)
     private static final Color CASE_CLAIRE = new Color(240, 217, 181);  // beige clair
@@ -385,6 +387,11 @@ public class ChessBoard {
                 int borderHeight = cellSize * rows;
                 g.drawRect(borderX, borderY, borderWidth - 1, borderHeight - 1);
                 
+                // Afficher l'interface de lancement si en mode lancement
+                if (launchManager != null && launchManager.isLaunchMode()) {
+                    launchManager.drawLaunchUI(g2d, getWidth(), getHeight());
+                }
+                
                 // Afficher le message de victoire si le jeu est terminé
                 if (gameOver && winner != null) {
                     // Fond semi-transparent
@@ -480,8 +487,55 @@ public class ChessBoard {
                 blackPaddle = new Paddle(centerX, blackPaddleY, paddleWidth, paddleHeight, false);
             }
             
-            // Traiter les touches appuyées
-            if (!gameOver) {
+            // Initialiser le gestionnaire de lancement s'il n'existe pas encore
+            if (launchManager == null) {
+                launchManager = new LaunchManager();
+                launchManager.setControlledPaddle(whitePaddle);
+            }
+            
+            // Vérifier si on est en mode lancement
+            if (launchManager.isLaunchMode() && !gameOver) {
+                // Gestion des entrées en mode lancement
+                int cellSize2 = Math.min(boardPanel.getWidth(), boardPanel.getHeight()) / 8;
+                int startCol2 = (8 - cols) / 2;
+                int minX2 = startCol2 * cellSize2;
+                int maxX2 = minX2 + (cellSize2 * cols);
+                
+                // Déplacement du paddle blanc en mode lancement
+                if (keysPressed[java.awt.event.KeyEvent.VK_Q]) {
+                    whitePaddle.moveLeft(minX2);
+                }
+                if (keysPressed[java.awt.event.KeyEvent.VK_D]) {
+                    whitePaddle.moveRight(maxX2);
+                }
+                
+                // Ajustement de l'angle de lancement
+                if (keysPressed[java.awt.event.KeyEvent.VK_A]) {
+                    launchManager.increaseLaunchAngle();
+                }
+                if (keysPressed[java.awt.event.KeyEvent.VK_E]) {
+                    launchManager.decreaseLaunchAngle();
+                }
+                
+                // Réinitialiser l'angle
+                if (keysPressed[java.awt.event.KeyEvent.VK_R]) {
+                    launchManager.resetAngle();
+                }
+                
+                // Mettre à jour la position de la balle sur le paddle
+                launchManager.updateBallPosition(ball);
+                
+                // Lancer la balle
+                if (keysPressed[java.awt.event.KeyEvent.VK_SPACE] || 
+                    keysPressed[java.awt.event.KeyEvent.VK_ENTER]) {
+                    launchManager.launchBall(ball, whitePaddle);
+                    
+                    // Réinitialiser les touches pour éviter les lancements multiples
+                    keysPressed[java.awt.event.KeyEvent.VK_SPACE] = false;
+                    keysPressed[java.awt.event.KeyEvent.VK_ENTER] = false;
+                }
+            } else if (!gameOver) {
+                // Mode jeu normal
                 int cellSize2 = Math.min(boardPanel.getWidth(), boardPanel.getHeight()) / 8;
                 int startCol2 = (8 - cols) / 2;
                 int minX2 = startCol2 * cellSize2;
@@ -520,10 +574,7 @@ public class ChessBoard {
                 // Mettre à jour l'inclinaison des paddles
                 whitePaddle.updateTilt();
                 blackPaddle.updateTilt();
-            }
-            
-            // Ne mettre à jour la balle que si le jeu n'est pas terminé
-            if (!gameOver) {
+                
                 // Mettre à jour la balle avec les limites de l'échiquier
                 ball.update(minX, minY, maxX, maxY);
                 checkBallCollisions(cellSize);

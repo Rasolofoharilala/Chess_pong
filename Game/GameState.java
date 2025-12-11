@@ -12,11 +12,13 @@ public class GameState {
     private boolean gameOver;
     private String winner;
     private boolean[] keysPressed;
+    private LaunchManager launchManager;
 
     public GameState() {
         this.gameOver = false;
         this.winner = null;
         this.keysPressed = new boolean[256];
+        this.launchManager = new LaunchManager();
     }
 
     // Getters et setters
@@ -74,5 +76,13 @@ public class GameState {
 
     public void setKeyPressed(int keyCode, boolean pressed) {
         keysPressed[keyCode] = pressed;
+    }
+
+    public LaunchManager getLaunchManager() {
+        return launchManager;
+    }
+
+    public void setLaunchManager(LaunchManager launchManager) {
+        this.launchManager = launchManager;
     }
 }
